@@ -24,7 +24,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.InvalidDescriptionException;
 import org.bukkit.plugin.InvalidPluginException;
 import org.bukkit.plugin.Plugin;
@@ -33,6 +32,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import com.google.gson.JsonObject;
 import com.struckplayz.ulpl.inventory.SpigetWebhook;
+import com.struckplayz.ulpl.util.InventoryUtil;
+import com.struckplayz.ulpl.util.PluginUtil;
 
 public class UnlimitedPlugins extends JavaPlugin implements Listener {
 
@@ -43,83 +44,12 @@ public class UnlimitedPlugins extends JavaPlugin implements Listener {
 
 	public void onEnable() {
 		metrics();
-		String u = checkUpdate();
-		if (u != null) {
-			if (!u.equals(this.getDescription().getVersion().toString())) {
-				getLogger().info("Your version of UnlimitedPlugins seems to be outdated.");
-				getLogger().info("Please download the latest version (v" + u + ") from https://www.spigotmc.org/resources/unlimitedplugins.32431/");
-			} else {
-				getLogger().info("Your version of UnlimitedPlugins is up-to-date!");
-			}
-		}
+		updater();
 		
 		instance = this;
-
-		ConsoleCommandSender sender = Bukkit.getConsoleSender();
-		FileConfiguration loadcf = new YamlConfiguration();
-		if (!file.exists() || !loadbefore.exists()) {
-			try {
-				file.mkdirs();
-				loadbefore.createNewFile();
-				loadcf = new YamlConfiguration();
-				loadcf.options().header("DO NOT DELETE THIS FILE!\n" + "This file is made for the plugin load order. \n"
-						+ "If you need certain plugins to load before others, put their names \n"
-						+ "on this list in the order you would like them to load.\n"
-						+ "If you need help with this file, contact me at: https://www.spigotmc.org/conversations/add?to=Struck713");
-				loadcf.set("load-order", new ArrayList<String>());
-				loadcf.save(loadbefore);
-			} catch (IOException e) {
-				sender.sendMessage("[UnlimitedPlugins] Failed to generate files.");
-			}
-			sender.sendMessage("[UnlimitedPlugins] Generated files!");
-		}
-		try {
-			loadcf.load(loadbefore);
-		} catch (IOException | InvalidConfigurationException e) {
-			sender.sendMessage("[UnlimitedPlugins] Failed to load loadbefore.yml");
-			return;
-		}
-		ArrayList<Plugin> loaded = new ArrayList<Plugin>();
-		sender.sendMessage("[UnlimitedPlugins] Starting load process.");
-		sender.sendMessage("[UnlimitedPlugins] Consulting loadbefore.yml.");
-		List<String> before = loadcf.getStringList("load-order");
-		if (!before.isEmpty()) {
-			for (String s : before) {
-				File f = getPluginFile(s);
-				if (f != null) {
-					Plugin pl = loadPlugin(sender, f, loaded);
-					if (pl != null) {
-						loaded.add(pl);
-					}
-				} else {
-					sender.sendMessage("[UnlimitedPlugins] Unknown plugin, " + s + ", in loadbefore.yml.");
-				}
-			}
-		} else {
-			sender.sendMessage("[UnlimitedPlugins] loadbefore.yml is empty!");
-		}
-		sender.sendMessage("[UnlimitedPlugins] Scanning files to see if anything is left to load.");
-		for (File f : file.listFiles()) {
-			String name = f.getName();
-			if (name.endsWith(".jar")) {
-				Plugin pl = loadPlugin(sender, f, loaded);
-				if (pl != null && !loaded.contains(pl)) {
-					loaded.add(pl);
-				}
-			}
-		}
-		if (loaded.size() != 0) {
-			sender.sendMessage("[UnlimitedPlugins] Listing loaded plugins: ");
-			sender.sendMessage("[UnlimitedPlugins] ----------------------------------");
-			for (Plugin p : loaded) {
-				sender.sendMessage("[UnlimitedPlugins] " + p.getName());
-			}
-			sender.sendMessage("[UnlimitedPlugins] ----------------------------------");
-		} else {
-			sender.sendMessage(
-					"[UnlimitedPlugins] Found no plugins to load. Place all plugins you want to load in the \""
-							+ file.getPath() + "\" directory.");
-		}
+		
+		
+		loadUnlimitedPlugins();
 		
 		Bukkit.getPluginManager().registerEvents(this, this);
 		
@@ -142,18 +72,22 @@ public class UnlimitedPlugins extends JavaPlugin implements Listener {
 		final String enabled = prefix + "Enabled the plugin, %s";
 		final String doesntExist = prefix + "That plugin doesn't exist.";
 		if (command.getName().equalsIgnoreCase("unlimitedplugins") || command.getName().equalsIgnoreCase("ulpl")) {
+			if (!(sender instanceof Player)) {
+				return true;
+			}
+			Player player = (Player)sender;
 			if (args.length == 0) {
 				sender.sendMessage(help);
 			}
 			if (args.length == 1) {
+				if (args[0].equalsIgnoreCase("status")) {
+					InventoryUtil.statusInventory(player);
+				}
 				if (args[0].equalsIgnoreCase("installer")) {
 					try {
 						ArrayList<JsonObject> objs = SpigetWebhook.getRecents();
-						Inventory i = getInventory("Spigot Resources - Recents", objs);
-						if (sender instanceof Player) {
-							Player player = (Player)sender;
-							player.openInventory(i);
-						}
+						Inventory i = SpigetWebhook.getInventory("Spigot Resources - Recents", objs);
+						player.openInventory(i);
 					} catch (IOException e1) {
 						sender.sendMessage(prefix + "Failed to create inventory. :-(");
 					}
@@ -164,9 +98,9 @@ public class UnlimitedPlugins extends JavaPlugin implements Listener {
 			if (args.length == 2) {
 				String name = args[1];
 				if (args[0].equalsIgnoreCase("disable")) {
-					if (isPlugin(name)) {
+					if (PluginUtil.isPlugin(name)) {
 						if (!name.equalsIgnoreCase(this.getDescription().getName())) {
-							Plugin kill = getPlugin(name);
+							Plugin kill = PluginUtil.getPlugin(name);
 							Bukkit.getScheduler().cancelTasks(kill);
 							Bukkit.getPluginManager().disablePlugin(kill);
 							sender.sendMessage(String.format(disabled, name));
@@ -177,9 +111,9 @@ public class UnlimitedPlugins extends JavaPlugin implements Listener {
 						sender.sendMessage(isntLoaded);
 					}
 				} else if (args[0].equalsIgnoreCase("enable")) {
-					if (!isPlugin(name)) {
-						if (isExisting(name)) {
-							File f = getPluginFile(name);
+					if (!PluginUtil.isPlugin(name)) {
+						if (PluginUtil.isExisting(name, file)) {
+							File f = PluginUtil.getPluginFile(name, file);
 							loadPlugin(sender, f, new ArrayList<Plugin>());
 							sender.sendMessage(String.format(enabled, name));
 						} else {
@@ -191,12 +125,10 @@ public class UnlimitedPlugins extends JavaPlugin implements Listener {
 				} else if (args[0].equalsIgnoreCase("search")) {
 					try {
 						ArrayList<JsonObject> objs = SpigetWebhook.search(args[1], 20);
-						Inventory i = getInventory("Spigot Resources - Search: " + args[1], objs);
-						if (sender instanceof Player) {
-							Player player = (Player)sender;
-							player.openInventory(i);
-						}
+						Inventory i = SpigetWebhook.getInventory("Spigot Search - " + args[1], objs);
+						player.openInventory(i);
 					} catch (IOException e) {
+						player.getOpenInventory().close();
 						sender.sendMessage(prefix + "Failed to search for plugin. :-(");
 					}
 				} else {
@@ -241,68 +173,72 @@ public class UnlimitedPlugins extends JavaPlugin implements Listener {
 		return pl;
 	}
 
-	private boolean isPlugin(String name) {
-		return Bukkit.getPluginManager().getPlugin(name) != null;
-	}
-
-	private Plugin getPlugin(String name) {
-		return Bukkit.getPluginManager().getPlugin(name);
-	}
-
-	private boolean isExisting(String name) {
-		for (File f : file.listFiles()) {
-			if (f.getName().replaceAll(".jar", "").equals(name)) {
-				return true;
+	public void loadUnlimitedPlugins() {
+		ConsoleCommandSender sender = Bukkit.getConsoleSender();
+		FileConfiguration loadcf = new YamlConfiguration();
+		if (!file.exists() || !loadbefore.exists()) {
+			try {
+				file.mkdirs();
+				loadbefore.createNewFile();
+				loadcf = new YamlConfiguration();
+				loadcf.options().header("DO NOT DELETE THIS FILE!\n" + "This file is made for the plugin load order. \n"
+						+ "If you need certain plugins to load before others, put their names \n"
+						+ "on this list in the order you would like them to load.\n"
+						+ "If you need help with this file, contact me at: https://www.spigotmc.org/conversations/add?to=Struck713");
+				loadcf.set("load-order", new ArrayList<String>());
+				loadcf.save(loadbefore);
+			} catch (IOException e) {
+				sender.sendMessage("[UnlimitedPlugins] Failed to generate files.");
 			}
+			sender.sendMessage("[UnlimitedPlugins] Generated files!");
 		}
-		for (File f : new File("plugins/").listFiles()) {
-			if (f.getName().replaceAll(".jar", "").equals(name)) {
-				return true;
-			}
+		try {
+			loadcf.load(loadbefore);
+		} catch (IOException | InvalidConfigurationException e) {
+			sender.sendMessage("[UnlimitedPlugins] Failed to load loadbefore.yml");
+			return;
 		}
-		return false;
-	}
-
-	private File getPluginFile(String name) {
-		for (File f : file.listFiles()) {
-			if (f.getName().replaceAll(".jar", "").equals(name)) {
-				return f;
-			}
-		}
-		for (File f : new File("plugins/").listFiles()) {
-			if (f.getName().replaceAll(".jar", "").equals(name)) {
-				return f;
-			}
-		}
-		return null;
-	}
-	
-	private Inventory getInventory(String nam, ArrayList<JsonObject> objs) {
-		Inventory i = Bukkit.createInventory(null, 27, nam);
-
-		for (JsonObject obj : objs) {
-			String name = obj.get("name").getAsString();
-			String tag = obj.get("tag").getAsString();
-			int id = obj.get("id").getAsInt();
-			ItemStack is = new ItemStack(Material.NAME_TAG);
-			ItemMeta im = is.getItemMeta();
-			im.setDisplayName("§7" + name);
-			im.setLore(new ArrayList<String>() {
-				private static final long serialVersionUID = 1L;
-				{
-
-					add("§7Tag: §a" + tag);
-					add("§7ID: §a" + id);
-					add(" ");
-					add("§aClick to download!");
-
+		ArrayList<Plugin> loaded = new ArrayList<Plugin>();
+		sender.sendMessage("[UnlimitedPlugins] Starting load process.");
+		sender.sendMessage("[UnlimitedPlugins] Consulting loadbefore.yml.");
+		List<String> before = loadcf.getStringList("load-order");
+		if (!before.isEmpty()) {
+			for (String s : before) {
+				File f = PluginUtil.getPluginFile(s, file);
+				if (f != null) {
+					Plugin pl = loadPlugin(sender, f, loaded);
+					if (pl != null) {
+						loaded.add(pl);
+					}
+				} else {
+					sender.sendMessage("[UnlimitedPlugins] Unknown plugin, " + s + ", in loadbefore.yml.");
 				}
-			});
-			is.setItemMeta(im);
-			i.addItem(is);
+			}
+		} else {
+			sender.sendMessage("[UnlimitedPlugins] loadbefore.yml is empty!");
 		}
-		
-		return i;
+		sender.sendMessage("[UnlimitedPlugins] Scanning files to see if anything is left to load.");
+		for (File f : file.listFiles()) {
+			String name = f.getName();
+			if (name.endsWith(".jar")) {
+				Plugin pl = loadPlugin(sender, f, loaded);
+				if (pl != null && !loaded.contains(pl)) {
+					loaded.add(pl);
+				}
+			}
+		}
+		if (loaded.size() != 0) {
+			sender.sendMessage("[UnlimitedPlugins] Listing loaded plugins: ");
+			sender.sendMessage("[UnlimitedPlugins] ----------------------------------");
+			for (Plugin p : loaded) {
+				sender.sendMessage("[UnlimitedPlugins] " + p.getName());
+			}
+			sender.sendMessage("[UnlimitedPlugins] ----------------------------------");
+		} else {
+			sender.sendMessage(
+					"[UnlimitedPlugins] Found no plugins to load. Place all plugins you want to load in the \""
+							+ file.getPath() + "\" directory.");
+		}
 	}
 	
 	@EventHandler
@@ -320,7 +256,7 @@ public class UnlimitedPlugins extends JavaPlugin implements Listener {
 			return;
 		}
 		String lore = is.getItemMeta().getLore().get(1);
-		if (i.getName().contains("Spigot Resources")) {
+		if (i.getName().contains("Spigot")) {
 			if (is.getItemMeta().hasLore()) {
 				String stripLore = ChatColor.stripColor(lore);
 				int id = Integer.parseInt(stripLore.replaceAll("ID: ", "").toString());
@@ -332,6 +268,30 @@ public class UnlimitedPlugins extends JavaPlugin implements Listener {
 				player.sendMessage(prefix + "Downloaded and loaded resource!");
 				
 				event.setCancelled(true);
+			}
+		} else if (i.getName().contains("Loaded Plugins")) {
+			if (is.getType() == Material.NAME_TAG) {
+				String clicked = ChatColor.stripColor(is.getItemMeta().getDisplayName());
+				Plugin p = Bukkit.getPluginManager().getPlugin(clicked);
+				if (p.isEnabled()) {
+					Bukkit.getPluginManager().disablePlugin(p);
+				} else {
+					Bukkit.getPluginManager().enablePlugin(p);
+				}
+				InventoryUtil.statusInventory(player);
+			}
+			event.setCancelled(true);
+		}
+	}
+	
+	public void updater() {
+		String u = checkUpdate();
+		if (u != null) {
+			if (!u.equals(this.getDescription().getVersion().toString())) {
+				getLogger().info("Your version of UnlimitedPlugins seems to be outdated.");
+				getLogger().info("Please download the latest version (v" + u + ") from https://www.spigotmc.org/resources/unlimitedplugins.32431/");
+			} else {
+				getLogger().info("Your version of UnlimitedPlugins is up-to-date!");
 			}
 		}
 	}

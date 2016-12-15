@@ -11,6 +11,10 @@ import java.net.URL;
 import java.util.ArrayList;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
 
 import com.google.gson.JsonArray;
@@ -42,7 +46,7 @@ public class SpigetWebhook {
 	public static ArrayList<JsonObject> getRecents() throws IOException {
 		ArrayList<JsonObject> objects = new ArrayList<JsonObject>();
 
-		URL url = new URL("https://api.spiget.org/v2/resources?size=20");
+		URL url = new URL("https://api.spiget.org/v2/resources/new?size=20");
 		BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
 
 		JsonElement parser = new JsonParser().parse(new JsonReader(in));
@@ -83,6 +87,38 @@ public class SpigetWebhook {
 	            fout.close();
 	        }
 	    }
+	}
+	
+	public static Inventory getInventory(String nam, ArrayList<JsonObject> objs) throws IOException {
+		String fixedName = nam.substring(0, 30);
+		Inventory i = Bukkit.createInventory(null, 27, fixedName);
+
+		for (JsonObject obj : objs) {
+			String name = obj.get("name").getAsString();
+			String tag = obj.get("tag").getAsString();
+			int id = obj.get("id").getAsInt();
+			String downloads = (obj.get("downloads") == null) ? "Couldn't grab amount of downloads.":obj.get("downloads").getAsInt() + "";
+			ItemStack is = new ItemStack(Material.NAME_TAG);
+			ItemMeta im = is.getItemMeta();
+			im.setDisplayName("§7" + name);
+			im.setLore(new ArrayList<String>() {
+				private static final long serialVersionUID = 1L;
+				{
+
+					add("§7Tag: §a" + tag);
+					add("§7ID: §a" + id);
+					add(" ");
+					add("§7Downloads: §a" + downloads);
+					add(" ");
+					add("§aClick to download!");
+
+				}
+			});
+			is.setItemMeta(im);
+			i.addItem(is);
+		}
+		
+		return i;
 	}
 
 }
