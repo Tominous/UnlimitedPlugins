@@ -1,0 +1,31 @@
+plugins {
+    id "java"
+}
+
+group "com.noah.ulpl"
+version "1.5-SNAPSHOT"
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+
+    maven {
+        url "http://repo.dmulloy2.net/nexus/repository/public/"
+    }
+
+    maven {
+        url "https://hub.spigotmc.org/nexus/content/repositories/snapshots/"
+    }
+
+    maven { 
+        url "https://oss.sonatype.org/content/repositories/snapshots"
+    }
+
+}
+
+dependencies {
+    compileOnly group: "com.comphenix.protocol", name: "ProtocolLib", version: "4.4.0"
+    compileOnly group: "org.spigotmc", name: "spigot-api", version: "1.13.2-R0.1-SNAPSHOT"
+}

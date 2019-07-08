@@ -1,0 +1,11 @@
+options:
+  updater: true
+
+messages:
+  prefix: '&aUnlimitedPlugins> &7'
+  command:
+    help: '/ulpl <disable/enable> <plugin>'
+    already-exists: 'That plugin doesn''t exist.'
+    management:
+      enabled: 'Enabled the plugin, %s'
+      disabled: 'Disabled the plugin, %s'

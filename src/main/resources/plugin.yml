@@ -1,0 +1,11 @@
+main: com.noah.ulpl.UnlimitedPlugins
+name: UnlimitedPlugins
+author: Struck713
+version: 1.5
+api-version: 1.14
+
+commands:
+    unlimitedplugins:
+        aliases: [ulpl]
+        description: Main UnlimitedPlugins command.
+        usage: /<command> <enable/disable> <plugin>
